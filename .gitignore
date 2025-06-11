@@ -1,0 +1,38 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go build command
+lol-auto-accept
+
+# Go workspace files
+go.work
+
+# Dependency directories
+vendor/
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# Go downloads
+*.linux-amd64.tar.gz
+*.windows-amd64.zip
+*.darwin-amd64.tar.gz
+
+# Installation scripts (keep only main ones)
+install_deps.sh
+install_missing_libs.sh
+install_x11_deps.sh
