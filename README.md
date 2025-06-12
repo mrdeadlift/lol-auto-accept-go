@@ -40,13 +40,15 @@ go mod tidy
 go run main.go
 ```
 
-2. League of Legends クライアントを起動
+2. ブラウザが自動で開きます（http://localhost:8080）
 
-3. 「監視開始」ボタンをクリックして自動承認を開始
+3. League of Legends クライアントを起動
 
-4. マッチングが見つかったら自動的に承認ボタンがクリックされます
+4. Webページで「監視開始」ボタンをクリックして自動承認を開始
 
-5. 「監視停止」ボタンで監視を終了
+5. マッチングが見つかったら自動的に承認ボタンがクリックされます
+
+6. 「監視停止」ボタンで監視を終了
 
 ## 注意事項
 
@@ -57,10 +59,11 @@ go run main.go
 
 ## 技術仕様
 
-- **GUI**: Fyne v2
+- **GUI**: WebブラウザベースUI (WebSocket + HTTP)
 - **スクリーンキャプチャ**: kbinani/screenshot
 - **画像処理**: 純粋Goによるテンプレートマッチング
-- **マウス制御**: xdotool (Linux)
+- **マウス制御**: PowerShell (Windows) / xdotool (Linux/macOS)
+- **Webフレームワーク**: Gorilla Mux + WebSocket
 
 ## ライセンス
 
