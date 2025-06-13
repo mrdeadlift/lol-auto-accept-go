@@ -36,3 +36,6 @@ Thumbs.db
 install_deps.sh
 install_missing_libs.sh
 install_x11_deps.sh
+
+# local setting files
+.claude/
