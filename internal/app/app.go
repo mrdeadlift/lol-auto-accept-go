@@ -93,79 +93,77 @@ func (a *App) StartMonitoring() {
 		defer ticker.Stop()
 
 		for a.IsRunning() {
-			select {
-			case <-ticker.C:
-				start := time.Now()
-				
-				// スクリーンショット取得
-				img, err := a.detector.CaptureScreen()
-				if err != nil {
-					continue
-				}
+			<-ticker.C
+			start := time.Now()
+			
+			// スクリーンショット取得
+			img, err := a.detector.CaptureScreen()
+			if err != nil {
+				continue
+			}
 
-				if a.IsWaitingForMatch() {
-					// マッチング画面を待機中
-					if a.detector.FastDetectMatchingScreen(img) {
-						a.wsManager.SendLog("マッチング画面を検出 - 承認ボタン監視を開始")
-						a.SetWaitingForMatch(false)
-						a.wsManager.UpdateStatus("承認ボタン監視中...")
-					} else {
-						// 5秒に1回マッチング待機状況をログ出力
-						if time.Now().Unix()%5 == 0 {
-							bounds := img.Bounds()
-							a.wsManager.SendLog(fmt.Sprintf("マッチング画面を待機中... (画面サイズ: %dx%d)", bounds.Dx(), bounds.Dy()))
-						}
-					}
+			if a.IsWaitingForMatch() {
+				// マッチング画面を待機中
+				if a.detector.FastDetectMatchingScreen(img) {
+					a.wsManager.SendLog("マッチング画面を検出 - 承認ボタン監視を開始")
+					a.SetWaitingForMatch(false)
+					a.wsManager.UpdateStatus("承認ボタン監視中...")
 				} else {
-					// 承認ボタンを監視中
-					// まずマッチング画面がまだ存在するかチェック
-					if !a.detector.FastDetectMatchingScreen(img) {
-						// マッチング画面が検出されなくなった場合、監視を停止
-						a.wsManager.SendLog("マッチング画面が検出されなくなりました - 監視を自動停止します")
-						a.StopMonitoring()
-						return
+					// 5秒に1回マッチング待機状況をログ出力
+					if time.Now().Unix()%5 == 0 {
+						bounds := img.Bounds()
+						a.wsManager.SendLog(fmt.Sprintf("マッチング画面を待機中... (画面サイズ: %dx%d)", bounds.Dx(), bounds.Dy()))
 					}
+				}
+			} else {
+				// 承認ボタンを監視中
+				// まずマッチング画面がまだ存在するかチェック
+				if !a.detector.FastDetectMatchingScreen(img) {
+					// マッチング画面が検出されなくなった場合、監視を停止
+					a.wsManager.SendLog("マッチング画面が検出されなくなりました - 監視を自動停止します")
+					a.StopMonitoring()
+					return
+				}
+				
+				buttonPos := a.detector.FastDetectAcceptButton(img)
+				if buttonPos != nil {
+					elapsed := time.Since(start)
 					
-					buttonPos := a.detector.FastDetectAcceptButton(img)
-					if buttonPos != nil {
-						elapsed := time.Since(start)
-						
-						// 詳細検証スコアを取得
-						verifyScore := a.detector.VerifyAcceptButton(img, buttonPos, 1.0)
-						a.wsManager.SendLog(fmt.Sprintf("承認ボタンを検出しました (位置: %d, %d, 検証スコア: %.3f, 検出時間: %v)", 
-							buttonPos.X, buttonPos.Y, verifyScore, elapsed))
-						
-						// より低い閾値でも許可（検証スコアが低くてもクリック）
-						if verifyScore > 0.2 {
-							if a.systemCtrl.ClickAcceptButton(buttonPos.X, buttonPos.Y) {
-								a.wsManager.SendLog("承認ボタンをクリックしました")
-								a.wsManager.SendLog("5秒待機後、マッチング画面の状態をチェックします")
-								// 5秒待機
-								time.Sleep(5 * time.Second)
-								// 5秒後にマッチング画面が検出されるかチェック
-								img2, err := a.detector.CaptureScreen()
-								if err == nil && !a.detector.FastDetectMatchingScreen(img2) {
-									a.wsManager.SendLog("マッチング画面が検出されなくなりました - 監視を自動停止します")
-									a.StopMonitoring()
-									return
-								} else {
-									a.wsManager.SendLog("マッチング画面が継続中 - 監視を継続します")
-								}
+					// 詳細検証スコアを取得
+					verifyScore := a.detector.VerifyAcceptButton(img, buttonPos, 1.0)
+					a.wsManager.SendLog(fmt.Sprintf("承認ボタンを検出しました (位置: %d, %d, 検証スコア: %.3f, 検出時間: %v)", 
+						buttonPos.X, buttonPos.Y, verifyScore, elapsed))
+					
+					// より低い閾値でも許可（検証スコアが低くてもクリック）
+					if verifyScore > 0.2 {
+						if a.systemCtrl.ClickAcceptButton(buttonPos.X, buttonPos.Y) {
+							a.wsManager.SendLog("承認ボタンをクリックしました")
+							a.wsManager.SendLog("5秒待機後、マッチング画面の状態をチェックします")
+							// 5秒待機
+							time.Sleep(5 * time.Second)
+							// 5秒後にマッチング画面が検出されるかチェック
+							img2, err := a.detector.CaptureScreen()
+							if err == nil && !a.detector.FastDetectMatchingScreen(img2) {
+								a.wsManager.SendLog("マッチング画面が検出されなくなりました - 監視を自動停止します")
+								a.StopMonitoring()
+								return
 							} else {
-								a.wsManager.SendLog("承認ボタンのクリックに失敗しました")
+								a.wsManager.SendLog("マッチング画面が継続中 - 監視を継続します")
 							}
 						} else {
-							a.wsManager.SendLog(fmt.Sprintf("検証スコアが低いため、クリックをスキップしました (スコア: %.3f)", verifyScore))
+							a.wsManager.SendLog("承認ボタンのクリックに失敗しました")
 						}
 					} else {
-						// 10秒に1回承認ボタン検索状況をログ出力（頻度を上げる）
-						if time.Now().Unix()%10 == 0 {
-							elapsed := time.Since(start)
-							a.wsManager.SendLog(fmt.Sprintf("承認ボタンを検索中... (検索時間: %v)", elapsed))
-							// デバッグ: 検索エリアの情報も出力
-							bounds := img.Bounds()
-							a.wsManager.SendLog(fmt.Sprintf("検索エリア: 画面サイズ %dx%d, 中央下部を重点検索", bounds.Dx(), bounds.Dy()))
-						}
+						a.wsManager.SendLog(fmt.Sprintf("検証スコアが低いため、クリックをスキップしました (スコア: %.3f)", verifyScore))
+					}
+				} else {
+					// 10秒に1回承認ボタン検索状況をログ出力（頻度を上げる）
+					if time.Now().Unix()%10 == 0 {
+						elapsed := time.Since(start)
+						a.wsManager.SendLog(fmt.Sprintf("承認ボタンを検索中... (検索時間: %v)", elapsed))
+						// デバッグ: 検索エリアの情報も出力
+						bounds := img.Bounds()
+						a.wsManager.SendLog(fmt.Sprintf("検索エリア: 画面サイズ %dx%d, 中央下部を重点検索", bounds.Dx(), bounds.Dy()))
 					}
 				}
 			}
@@ -198,24 +196,22 @@ func (a *App) StartAutoWatcher() {
 		defer ticker.Stop()
 
 		for a.IsAutoWatching() {
-			select {
-			case <-ticker.C:
-				// 既に監視中の場合はスキップ
-				if a.IsRunning() {
-					continue
-				}
+			<-ticker.C
+			// 既に監視中の場合はスキップ
+			if a.IsRunning() {
+				continue
+			}
 
-				// スクリーンショット取得
-				img, err := a.detector.CaptureScreen()
-				if err != nil {
-					continue
-				}
+			// スクリーンショット取得
+			img, err := a.detector.CaptureScreen()
+			if err != nil {
+				continue
+			}
 
-				// マッチング画面を検出
-				if a.detector.FastDetectMatchingScreen(img) {
-					a.wsManager.SendLog("マッチング画面を検出 - 自動監視を開始します")
-					a.StartMonitoring()
-				}
+			// マッチング画面を検出
+			if a.detector.FastDetectMatchingScreen(img) {
+				a.wsManager.SendLog("マッチング画面を検出 - 自動監視を開始します")
+				a.StartMonitoring()
 			}
 		}
 	}()
